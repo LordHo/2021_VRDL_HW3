@@ -2,3 +2,7 @@ dataset
 *.txt
 *.pptx
 *.zip
+*.pyc
+model
+result
+answers

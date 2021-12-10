@@ -74,3 +74,26 @@ Using AP@0.5, IoU=.50 means set .50 as threshold of IoU.
 ## Summary
 
 ## Reference
+
+## Template Disscussion
+
+- 5th place solution (based only on Mask-RCNN)
+  - <https://www.kaggle.com/c/data-science-bowl-2018/discussion/56326>
+
+- mask-rcnn and instance segmentation network
+  - <https://www.kaggle.com/c/data-science-bowl-2018/discussion/47690>
+
+- Top 5, also with the weights
+  - <https://www.kaggle.com/c/data-science-bowl-2018/discussion/56316>
+
+- 10th place Code+Datasets (LB: 0.591) Mask R-CNN single model
+  - <https://www.kaggle.com/c/data-science-bowl-2018/discussion/56238>
+
+- [ods ai topcoders, 1st place solution]
+  - <https://www.kaggle.com/c/data-science-bowl-2018/discussion/54741>
+  - <https://github.com/selimsef/dsb2018_topcoders/>
+
+## Problem & Answer
+
+1. using model.eval() vs torch.no_grad()  
+   ![model.eval() vs torch.no_grad()](readme_img/eval%20vs%20no_grad.png)
