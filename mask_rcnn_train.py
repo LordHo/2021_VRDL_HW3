@@ -56,15 +56,18 @@ def getlosses(loss_dict):
     return sum(loss for loss in loss_dict.values())
 
 
-def train(date):
+def train(date, train_dir, save_model_dir, load_model_path=None):
     num_epochs = 100  # one epoch need 5min, 100 epochs about 8 hr
     print(torch.cuda.is_available())
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'Device: {device}')
-    # model = get_model_instance_segmentation(num_classes=2)
-    model_path = os.path.join('model', 'Mask R-CNN',
-                              '2021-12-09 21-03-21-epoch-5.pkl')
-    model = load_model(model_path)
+    if load_model_path is None:
+        model = get_model_instance_segmentation(num_classes=2)
+    else:
+        # model_path = os.path.join('model', 'Mask R-CNN', 'divide-4',
+        #                       '2021-12-12 00-00-07-epoch-100.pkl')
+        model = load_model(load_model_path)
+
     model.to(device)
 
     optimizer = get_optimizer(model)
@@ -72,9 +75,11 @@ def train(date):
 
     # train_dir = os.path.join('dataset', 'train')
     # train_dir = os.path.join('dataset', 'test_dataloader')
-    train_dir = os.path.join('dataset', 'divide-2')
+    # train_dir = os.path.join('dataset', 'divide-2')
+    # train_dir = os.path.join('dataset', 'divide-4')
+    # train_dir = os.path.join('dataset', 'image-4-divide-4')
     dataset = MaskRCNNTrainDataset(train_dir)
-    dataloader = DataLoader(dataset, batch_size=1,
+    dataloader = DataLoader(dataset, batch_size=2,
                             shuffle=True, collate_fn=collate_fn)
 
     best_total_loss = float('inf')
@@ -84,7 +89,7 @@ def train(date):
         total_train_loss = getemptytotalloss()
         pbar = tqdm(dataloader)
         for batch_index, (batch_image, batch_target, batch_image_name) in enumerate(pbar):
-
+            time.sleep(0.25)
             # pil_image = transforms.ToPILImage()(torch.squeeze(batch_image[0]))
             # pil_image = drawbox(batch_target[0]['boxes'][0], pil_image)
             # pil_image.show()
@@ -100,6 +105,7 @@ def train(date):
             del batch_target
 
             loss_dict = model(x, y)
+            time.sleep(0.25)
 
             del x
             del y
@@ -127,14 +133,17 @@ def train(date):
 
         scheduler.step()
 
-        save_model_path = os.path.join('model', 'Mask R-CNN')
-        if not os.path.exists(save_model_path):
-            os.makedirs(save_model_path)
+        # save_model_dir = os.path.join(
+        #     'model', 'Mask R-CNN', 'image-4-divide-4')
+        if not os.path.exists(save_model_dir):
+            os.makedirs(save_model_dir)
 
         if total_train_loss['total_loss'] < best_total_loss:
             best_total_loss = total_train_loss['total_loss']
             print(f'Save model at epoch {i}.')
-            torch.save(model, os.path.join(
-                save_model_path, f'{date}-epoch-{i}.pkl'))
+            save_model_path = os.path.join(
+                save_model_dir, f'{date}-epoch-{i}.pkl')
+            torch.save(model, save_model_path)
+            print(save_model_path)
 
         del total_train_loss

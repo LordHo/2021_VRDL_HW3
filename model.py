@@ -31,8 +31,8 @@ def get_model_instance_segmentation(num_classes):
 
 def get_optimizer(model):
     params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = torch.optim.Adam(params, lr=1e-4)
-    # optimizer = torch.optim.Adam(params, lr=1e-5)
+    # optimizer = torch.optim.Adam(params, lr=1e-4)
+    optimizer = torch.optim.Adam(params, lr=1e-5)
     return optimizer
 
 

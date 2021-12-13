@@ -97,3 +97,7 @@ Using AP@0.5, IoU=.50 means set .50 as threshold of IoU.
 
 1. using model.eval() vs torch.no_grad()  
    ![model.eval() vs torch.no_grad()](readme_img/eval%20vs%20no_grad.png)
+
+2. mAP calculate
+
+   - <https://blog.csdn.net/gongyi_yf/article/details/105884951>

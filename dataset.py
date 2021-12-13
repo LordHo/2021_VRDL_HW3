@@ -5,6 +5,7 @@ from PIL import Image
 import numpy as np
 import torch
 import torchvision
+import math
 
 
 def collate_fn(batch):
@@ -196,6 +197,122 @@ class MaskRCNNEvalDataset(AbstractDataset):
         image_name = self.image_list[index]
         image = self.__getimage__(image_name)
         return image.type(torch.cuda.FloatTensor), image_name
+
+
+class MaskRCNNEvalDivideDataset(MaskRCNNEvalDataset):
+    def __init__(self, dir, divide):
+        super().__init__(dir)
+        self.divide = divide
+
+    def __getpartitions__(self, width, height):
+        """
+            if divide a image with n = 2,
+            -------
+            | 0| 1|
+            |--|--|
+            | 2| 3|
+            -------
+        """
+        partitions = []
+        p_width, p_height = (width//self.divide), (height//self.divide)
+        for x in range(self.divide):
+            for y in range(self.divide):
+                partition_num = x * self.divide + y
+                left = y * p_width
+                top = x * p_height
+                right = (y+1) * p_width
+                bottom = (x+1) * p_height
+                crop_area = (left, top, right, bottom)
+                partitions.append((partition_num, crop_area))
+        return partitions
+
+    def __divideimage__(self, image, partition):
+        partition_num, crop_area = partition
+        crop_image = image.crop(crop_area)
+        return crop_image
+
+    def __getimage__(self, image_name):
+        image_path = os.path.join(self.dir, image_name)
+        image = Image.open(image_path).convert('RGB')
+        return image
+
+    def __imageToTensor__(self, image):
+        image = self.PILToTensor(image)
+        image = image.to(torch.float32)
+        image /= 255
+        return image
+
+    def __getitem__(self, index):
+        image_name = self.image_list[index]
+        image = self.__getimage__(image_name)
+        width, height = image.size
+        partitions = self.__getpartitions__(width, height)
+
+        crop_image_tensor_list = []
+        for partition in partitions:
+            crop_image = self.__divideimage__(image, partition)
+            crop_image_tensor = self.__imageToTensor__(crop_image)
+            crop_image_tensor = crop_image_tensor.type(torch.cuda.FloatTensor)
+            crop_image_tensor_list.append(crop_image_tensor)
+        return crop_image_tensor_list, partitions, image_name
+
+    def __concatvertical__(self, image1, image2, mode):
+        assert mode in ['L', 'RGB']
+        assert image1.width == image2.width
+        dst = Image.new(mode, (image1.width, image1.height + image2.height))
+        dst.paste(image1, (0, 0))
+        dst.paste(image2, (0, image1.height))
+        return dst
+
+    def __concathorizontal__(self, image1, image2, mode):
+        assert mode in ['L', 'RGB']
+        assert image1.height == image2.height
+        dst = Image.new(mode, (image1.width + image2.width, image1.height))
+        dst.paste(image1, (0, 0))
+        dst.paste(image2, (image1.width, 0))
+        return dst
+
+    def __mergecropimages__(self, crop_image_list, partitions, mode):
+        divide = math.sqrt(len(partitions))
+        concat_image = None
+        for partition_num, _ in partitions:
+            if partition_num % divide == 0:
+                row_image = crop_image_list[partition_num]
+            else:
+                row_image = self.__concathorizontal__(
+                    row_image, crop_image_list[partition_num], mode)
+
+            if partition_num % divide == (divide - 1):
+                if concat_image is None:
+                    concat_image = row_image
+                else:
+                    concat_image = self.__concatvertical__(
+                        concat_image, row_image, mode)
+        return concat_image
+
+    def __resizecropmask__(self, mask, mask_partition_num, partitions, mode):
+        divide = math.sqrt(len(partitions))
+        concat_image = None
+        partitions = sorted(partitions, key=lambda x: x[0])
+        for partition_num, _ in partitions:
+            if partition_num == mask_partition_num:
+                partition_mask = mask
+            else:
+                partition_mask = Image.new("L", mask.size, 0)
+
+            if partition_num % divide == 0:
+                row_image = partition_mask
+            else:
+                row_image = self.__concathorizontal__(
+                    row_image, partition_mask, mode)
+
+            if partition_num % divide == (divide - 1):
+                if concat_image is None:
+                    concat_image = row_image
+                else:
+                    concat_image = self.__concatvertical__(
+                        concat_image, row_image, mode)
+        return concat_image
 
 
 if __name__ == '__main__':
