@@ -1,5 +1,3 @@
-from torch._C import dtype
-from torch.optim import optimizer
 from dataset import MaskRCNNTrainDataset, collate_fn
 from model import get_model_instance_segmentation, get_optimizer, load_model, get_scheduler
 import torch
@@ -7,9 +5,6 @@ import os
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import time
-
-from mask_rcnn_eval import drawbox
-from torchvision import transforms
 
 
 def DataToDevice(images, targets, device):
@@ -46,23 +41,36 @@ def getmessage(loss_dict, total_train_loss, batch_index):
     message = []
     for key, loss in loss_dict.items():
         total_train_loss[key] += loss
-        message.append(f'{key}: {total_train_loss[key]/(batch_index+1):.2f}')
+        message.append(f'{key}: {total_train_loss[key]/(batch_index+1):.4f}')
     message = ' '.join(message)
 
     return message, total_train_loss
 
 
 def getlosses(loss_dict):
-    return sum(loss for loss in loss_dict.values())
+    def controll_weights(loss_name):
+        if loss_name in ['loss_mask']:
+            return 1.5
+        elif loss_name in ['loss_classifier']:
+            return 0
+        else:
+            return 1
+    # return sum(loss for loss in loss_dict.values())
+    return sum(loss * controll_weights(loss_name) for loss_name, loss in loss_dict.items())
 
 
-def train(date, train_dir, save_model_dir, load_model_path=None):
+def train(date, train_dir, save_model_dir, load_model_path=None, model=None):
     num_epochs = 100  # one epoch need 5min, 100 epochs about 8 hr
     print(torch.cuda.is_available())
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'Device: {device}')
     if load_model_path is None:
-        model = get_model_instance_segmentation(num_classes=2)
+        if model == 'resnet_101_fpn':
+            model_name = 'resnet_101_fpn'
+        else:
+            model_name = 'resnet_50_fpn'
+        model = get_model_instance_segmentation(
+            num_classes=2, model_name=model_name)
     else:
         # model_path = os.path.join('model', 'Mask R-CNN', 'divide-4',
         #                       '2021-12-12 00-00-07-epoch-100.pkl')
@@ -79,7 +87,7 @@ def train(date, train_dir, save_model_dir, load_model_path=None):
     # train_dir = os.path.join('dataset', 'divide-4')
     # train_dir = os.path.join('dataset', 'image-4-divide-4')
     dataset = MaskRCNNTrainDataset(train_dir)
-    dataloader = DataLoader(dataset, batch_size=2,
+    dataloader = DataLoader(dataset, batch_size=1,
                             shuffle=True, collate_fn=collate_fn)
 
     best_total_loss = float('inf')
@@ -129,7 +137,10 @@ def train(date, train_dir, save_model_dir, load_model_path=None):
 
             del loss_dict
 
-            pbar.set_description(f'Epoch: {i}, lr: {lr:.0e}, {message}')
+            total_ = total_train_loss['total_loss']
+
+            pbar.set_description(
+                f'Epoch: {i}, lr: {lr:.0e}, total loss: {total_/(batch_index+1):.4f}, {message}')
 
         scheduler.step()
 
@@ -142,7 +153,7 @@ def train(date, train_dir, save_model_dir, load_model_path=None):
             best_total_loss = total_train_loss['total_loss']
             print(f'Save model at epoch {i}.')
             save_model_path = os.path.join(
-                save_model_dir, f'{date}-epoch-{i}.pkl')
+                save_model_dir, f'{date}-best.pkl')
             torch.save(model, save_model_path)
             print(save_model_path)
 

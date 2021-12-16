@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader
 
 import json
 import time
+import glob
 
 from pycocotools.mask import encode, decode
 
@@ -201,7 +202,7 @@ def getarea(box):
 
 
 @torch.no_grad()
-def eval_divide(date, eval_image_dir, model_path, threshold=0.9, minarea=15):
+def eval_divide(date, eval_image_dir, model_path, threshold=0.9, minarea=15, divide=2):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # model_path = os.path.join('model', 'Mask R-CNN',
@@ -214,8 +215,8 @@ def eval_divide(date, eval_image_dir, model_path, threshold=0.9, minarea=15):
 
     # eval_image_dir = os.path.join('dataset', 'test')
     # eval_image_dir = os.path.join('dataset', 'test_only_one_image')
-    # dataset = MaskRCNNEvalDivideDataset(eval_image_dir, divide=2)
-    dataset = MaskRCNNEvalDivideDataset(eval_image_dir, divide=4)
+    dataset = MaskRCNNEvalDivideDataset(eval_image_dir, divide=divide)
+    # dataset = MaskRCNNEvalDivideDataset(eval_image_dir, divide=4)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
     for (images, partitions, image_name) in tqdm(dataloader):
@@ -255,7 +256,7 @@ def eval_divide(date, eval_image_dir, model_path, threshold=0.9, minarea=15):
 
                     numpy_mask = torch.squeeze(
                         mask).cpu().numpy()
-                    numpy_mask[numpy_mask > 0.3] = 1
+                    # numpy_mask[numpy_mask > 0.3] = 1
                     numpy_mask = numpy_mask.astype(np.uint8)
                     if len(np.unique(numpy_mask)) > 1 and getarea(box) > minarea:
                         # rle_mask = encode(np.asfortranarray(numpy_mask))
@@ -318,7 +319,7 @@ def getresizecocobox(coco_box, partition):
 
 
 @torch.no_grad()
-def eval_coco_divide(date, eval_image_dir, model_path, threshold=0.9, minarea=15, return_answers=False):
+def eval_coco_divide(date, eval_image_dir, model_path, threshold=0.9, minarea=15, return_answers=False, top_num=100):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = load_model(model_path)
 
@@ -335,6 +336,7 @@ def eval_coco_divide(date, eval_image_dir, model_path, threshold=0.9, minarea=15
     test_image_info = loadtestimageinfo()
 
     for (images, partitions, image_name) in tqdm(dataloader):
+        per_image_answer = []
         image_id = None
         image_size = None
         for image_info in test_image_info:
@@ -381,8 +383,12 @@ def eval_coco_divide(date, eval_image_dir, model_path, threshold=0.9, minarea=15
 
                         rle_mask = RLE(np.asfortranarray(numpy_mask))
                         answer['segmenation'] = rle_mask
-                        answers.append(answer)
+                        # answers.append(answer)
+                        per_image_answer.append(answer)
                         # print(answer)
+        per_image_answer = sorted(per_image_answer, key=lambda x: x['score'])
+        per_image_answer = per_image_answer[-1*(top_num):]
+        answers = answers + per_image_answer
     if return_answers:
         return answers
     else:
@@ -405,3 +411,29 @@ def mergeanswers(answers_list, date):
     createdir(dir_path)
     print(json.dumps(mergeed_answers, indent=4), file=open(
         os.path.join(dir_path, f'answer.json'), 'w'))
+
+
+def getboxfrommask(mask):
+    (y_list, x_list) = np.where(mask == 255)
+    if len(x_list) == 0 or len(y_list) == 0:
+        return [-1, -1, -1, -1]
+    xmin = min(x_list)
+    xmax = max(x_list)
+    ymin = min(y_list)
+    ymax = max(y_list)
+    box = [xmin, ymin, xmax, ymax]
+    return box
+
+
+def draw_label_box_on_image(root_dir, result_dir):
+    images_dir = os.path.join(root_dir, 'images')
+    masks_dir = os.path.join(root_dir, 'masks')
+    for image_path in glob.glob(os.path.join(images_dir, '*.png')):
+        image_name = os.path.basename(image_path)
+        image = Image.open(image_path).convert('RGB')
+        for mask_path in glob.glob(os.path.join(masks_dir, '*.png')):
+            mask = Image.open(mask_path).convert('L')
+            mask = np.array(mask).astype(np.uint8)
+            box = getboxfrommask(mask)
+            image = drawbox(box, image)
+        image.save(os.path.join(result_dir, image_name))
