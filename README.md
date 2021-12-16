@@ -70,12 +70,10 @@ Mask R-CNN (ResNet-50 + FPN)
 
 - <https://drive.google.com/file/d/17wpBJ5M0FB3xFWNmLOTPRsfdWl6Y4Ebu/view?usp=sharing>
 
-## Analyze
+## Summary
 
 The Mask R-CNN with ResNet-101 + FPN should be better or at least perform as great asMask R-CNN with ResNet-50 + FPN, but the result show the opposite result. This must be something wrong, but I still not find the problem so far.
 I try divide image into 4 parts and 16 parts to train and to predict, divide into 16 parts have an advantage with limited GPU memory, but result almost as same as divide into 4 parts. In addition, divide into 16 parts will have more severe on the problem that some nuclei has been divided.
-
-## Summary
 
 ## Reference
 
