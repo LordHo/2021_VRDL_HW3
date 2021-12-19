@@ -37,16 +37,19 @@ def get_model_instance_segmentation(num_classes, model_name='resnet_50_fpn'):
 
 
 def get_mask_rcnn_resnet_101_fpn(num_classes):
+    # backbone = resnet_fpn_backbone(
+    #     'resnet101', pretrained=True, trainable_layers=3)
     backbone = resnet_fpn_backbone(
-        'resnet101', pretrained=True, trainable_layers=3)
+        'resnet101', pretrained=True, trainable_layers=5)
     model = MaskRCNN(backbone, num_classes,
-                     box_detections_per_img=200)
+                     box_detections_per_img=100)
     return model
 
 
 def get_optimizer(model):
     params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = torch.optim.Adam(params, lr=1e-4)
+    optimizer = torch.optim.Adam(params, lr=5e-4)
+    # optimizer = torch.optim.Adam(params, lr=1e-4)
     # optimizer = torch.optim.Adam(params, lr=1e-5)
     return optimizer
 

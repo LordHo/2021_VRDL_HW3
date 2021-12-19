@@ -87,8 +87,12 @@ def train(date, train_dir, save_model_dir, load_model_path=None, model=None):
     # train_dir = os.path.join('dataset', 'divide-4')
     # train_dir = os.path.join('dataset', 'image-4-divide-4')
     dataset = MaskRCNNTrainDataset(train_dir)
-    dataloader = DataLoader(dataset, batch_size=1,
-                            shuffle=True, collate_fn=collate_fn)
+    dataloader = DataLoader(dataset,
+                            batch_size=1,
+                            shuffle=True,
+                            collate_fn=collate_fn,
+                            num_workers=4,
+                            pin_memory=True)
 
     best_total_loss = float('inf')
 
